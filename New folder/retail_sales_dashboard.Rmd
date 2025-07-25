@@ -1,15 +1,32 @@
+ I have read the CSV file into R using read.csv() and stored it in a variable named sales_data.
+sales_data<-read.csv("sales_data_sample.csv") 
 
-sales_data<-read.csv("sales_data_sample.csv")
+This line is just to print the entire dataset so I can check if it's loaded properly.
 print(sales_data)
+Here, I’m checking the column names of the dataset to understand the structure.
 colnames(sales_data)
+I calculated the total sales by summing up the SALES column. I used na.rm = TRUE to ignore any missing values.
 total_sales <- sum(sales_data$SALES, na.rm = TRUE)
 print(total_sales)
+
+This line counts the number of unique orders by using unique() on the ORDERNUMBER column.
 total_orders <- length(unique(sales_data$ORDERNUMBER))
 print(total_orders)
+
+I calculated the total quantity of products sold by summing the QUANTITYORDERED column.
 total_units_sold <- sum(sales_data$QUANTITYORDERED, na.rm = TRUE)
 print(total_units_sold)
+
+This gives the count of unique product codes sold.
 total_products_sold <- length(unique(sales_data$PRODUCTCODE))
 print(total_products_sold)
+
+In this part, I used dplyr functions to:
+Group the data by PRODUCTCODE
+Calculate total sales for each product
+Sort products by sales in descending order
+
+Take the top 5 best-selling products
 top_products <- sales_data %>%
   group_by(PRODUCTCODE) %>%
   summarise(TotalSales = sum(SALES, na.rm = TRUE)) %>%
