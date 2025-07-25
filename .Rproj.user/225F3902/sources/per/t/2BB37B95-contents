@@ -1,0 +1,71 @@
+
+sales_data<-read.csv("sales_data_sample.csv")
+print(sales_data)
+colnames(sales_data)
+total_sales <- sum(sales_data$SALES, na.rm = TRUE)
+print(total_sales)
+total_orders <- length(unique(sales_data$ORDERNUMBER))
+print(total_orders)
+total_units_sold <- sum(sales_data$QUANTITYORDERED, na.rm = TRUE)
+print(total_units_sold)
+total_products_sold <- length(unique(sales_data$PRODUCTCODE))
+print(total_products_sold)
+top_products <- sales_data %>%
+  group_by(PRODUCTCODE) %>%
+  summarise(TotalSales = sum(SALES, na.rm = TRUE)) %>%
+  arrange(desc(TotalSales)) %>%
+  head(5)
+  print(top_products)
+
+category_summary_plot <- sales_data %>%
+  group_by(PRODUCTLINE) %>%
+  summarise(Sales = sum(ifelse(STATUS == "Shipped", SALES, 0), na.rm = TRUE),
+    Returns = sum(ifelse(STATUS == "Returned", SALES, 0), na.rm = TRUE)
+  ) %>%
+  pivot_longer(cols = c("Sales", "Returns"), names_to = "Type", values_to = "Amount")
+ggplot(category_summary_plot, aes(x = reorder(PRODUCTLINE, -Amount), y = Amount, fill = Type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Sales vs Returns by Product Category",
+       x = "Product Line",
+       y = "Amount",
+       fill = "Type") +
+  scale_y_continuous(labels = scales::dollar) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  ggsave("category_sales_vs_returns.png", width = 10, height = 6)
+#Customer Behavior Analysis
+top_customers <- sales_data %>%
+  group_by(CUSTOMERNAME) %>%
+  summarise(TotalSales = sum(SALES, na.rm = TRUE)) %>%
+  arrange(desc(TotalSales)) %>%
+  head(10)
+print(top_customers)
+#Time Series Analysis (Analyze trends over time)
+sales_data$ORDERDATE <- as.Date(sales_data$ORDERDATE, format = "%m/%d/%Y")
+monthly_sales <- sales_data %>%
+  mutate(Month = format(ORDERDATE, "%Y-%m")) %>%
+  group_by(Month) %>%
+  summarise(MonthlySales = sum(SALES, na.rm = TRUE))
+
+ggplot(monthly_sales, aes(x = as.Date(paste0(Month, "-01")), y = MonthlySales)) +
+  geom_line(color = "steelblue", size = 1.2) +
+  labs(title = "Monthly Sales Over Time", x = "Month", y = "Sales") +
+  scale_y_continuous(labels = scales::dollar) +
+  theme_minimal()
+ggsave("sales_over_time.png", width = 8, height = 6, dpi = 300)
+
+#Regional Sales Performance
+sales_by_country <- sales_data %>%
+  group_by(COUNTRY) %>%
+  summarise(TotalSales = sum(SALES, na.rm = TRUE)) %>%
+  arrange(desc(TotalSales))
+
+ggplot(sales_by_country, aes(x = reorder(COUNTRY, -TotalSales), y = TotalSales)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  labs(title = "Sales by Country", x = "Country", y = "Sales") +
+  theme_minimal() + scale_y_continuous(labels=scales::label_dollar(scales=1e-6,suffix="M")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave("sales_by_country.png", width = 8, height= 6, dpi = 300)
+
+
+

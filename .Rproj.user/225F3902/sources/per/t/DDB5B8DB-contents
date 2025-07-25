@@ -1,0 +1,132 @@
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(scales)
+
+# Load data
+sales_data <- read.csv("sales_data_sample.csv")
+
+# Pre-processing
+sales_data$ORDERDATE <- as.Date(sales_data$ORDERDATE, format = "%m/%d/%Y")
+
+# Summary stats
+total_sales <- sum(sales_data$SALES, na.rm = TRUE)
+total_orders <- length(unique(sales_data$ORDERNUMBER))
+total_units_sold <- sum(sales_data$QUANTITYORDERED, na.rm = TRUE)
+total_products_sold <- length(unique(sales_data$PRODUCTCODE))
+
+# Top 5 products
+top_products <- sales_data %>%
+  group_by(PRODUCTCODE) %>%
+  summarise(TotalSales = sum(SALES, na.rm = TRUE)) %>%
+  arrange(desc(TotalSales)) %>%
+  head(5)
+
+# Category summary for plot
+category_summary_plot <- sales_data %>%
+  group_by(PRODUCTLINE) %>%
+  summarise(
+    Sales = sum(ifelse(STATUS == "Shipped", SALES, 0), na.rm = TRUE),
+    Returns = sum(ifelse(STATUS == "Returned", SALES, 0), na.rm = TRUE)
+  ) %>%
+  pivot_longer(cols = c("Sales", "Returns"), names_to = "Type", values_to = "Amount")
+
+# Top 10 customers
+top_customers <- sales_data %>%
+  group_by(CUSTOMERNAME) %>%
+  summarise(TotalSales = sum(SALES, na.rm = TRUE)) %>%
+  arrange(desc(TotalSales)) %>%
+  head(10)
+
+# Monthly sales
+monthly_sales <- sales_data %>%
+  mutate(Month = format(ORDERDATE, "%Y-%m")) %>%
+  group_by(Month) %>%
+  summarise(MonthlySales = sum(SALES, na.rm = TRUE))
+
+# Country-wise sales
+sales_by_country <- sales_data %>%
+  group_by(COUNTRY) %>%
+  summarise(TotalSales = sum(SALES, na.rm = TRUE)) %>%
+  arrange(desc(TotalSales))
+
+# ==========================
+# UI
+# ==========================
+ui <- fluidPage(
+  titlePanel("Interactive Sales Dashboard"),
+  
+  fluidRow(
+    column(3, strong("Total Sales:"), textOutput("totalSales")),
+    column(3, strong("Total Orders:"), textOutput("totalOrders")),
+    column(3, strong("Units Sold:"), textOutput("totalUnits")),
+    column(3, strong("Products Sold:"), textOutput("totalProducts"))
+  ),
+  
+  tabsetPanel(
+    tabPanel("Top Products",
+             h4("Top 5 Products by Sales"),
+             tableOutput("topProductsTable")),
+    
+    tabPanel("Sales vs Returns",
+             h4("Sales vs Returns by Product Category"),
+             plotOutput("categoryPlot", height = "400px")),
+    
+    tabPanel("Top Customers",
+             h4("Top 10 Customers by Sales"),
+             tableOutput("topCustomersTable")),
+    
+    tabPanel("Monthly Trend",
+             h4("Monthly Sales Over Time"),
+             plotOutput("monthlyPlot", height = "400px")),
+    
+    tabPanel("Regional Sales",
+             h4("Sales by Country"),
+             plotOutput("countryPlot", height = "400px"))
+  )
+)
+
+# ==========================
+# SERVER
+# ==========================
+server <- function(input, output) {
+  output$totalSales <- renderText({ dollar(total_sales) })
+  output$totalOrders <- renderText({ total_orders })
+  output$totalUnits <- renderText({ total_units_sold })
+  output$totalProducts <- renderText({ total_products_sold })
+  
+  output$topProductsTable <- renderTable({ top_products })
+  
+  output$categoryPlot <- renderPlot({
+    ggplot(category_summary_plot, aes(x = reorder(PRODUCTLINE, -Amount), y = Amount, fill = Type)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      labs(title = "Sales vs Returns by Product Category",
+           x = "Product Line", y = "Amount", fill = "Type") +
+      scale_y_continuous(labels = scales::dollar) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
+  
+  output$topCustomersTable <- renderTable({ top_customers })
+  
+  output$monthlyPlot <- renderPlot({
+    ggplot(monthly_sales, aes(x = as.Date(paste0(Month, "-01")), y = MonthlySales)) +
+      geom_line(color = "steelblue", size = 1.2) +
+      labs(title = "Monthly Sales Over Time", x = "Month", y = "Sales") +
+      scale_y_continuous(labels = scales::dollar) +
+      theme_minimal()
+  })
+  
+  output$countryPlot <- renderPlot({
+    ggplot(sales_by_country, aes(x = reorder(COUNTRY, -TotalSales), y = TotalSales)) +
+      geom_bar(stat = "identity", fill = "darkgreen") +
+      labs(title = "Sales by Country", x = "Country", y = "Sales") +
+      scale_y_continuous(labels = label_dollar(scale = 1e-6, suffix = "M")) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
+}
+
+# Run the app
+shinyApp(ui = ui, server = server)
